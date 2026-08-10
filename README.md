@@ -1,116 +1,70 @@
-# Builders Technical Assessment
+# Cinema Ticketing
 
-Welcome to the Builders Technical Assessment. This is a 50-minute AI-native coding assessment.
+A full-stack ticketing system for a cinema that sells ~10,000 tickets a month. For major releases, seats can sell out within minutes, and a small number of buyers grabbing large blocks (scalpers) makes that worse for everyone else.
 
-## What we evaluate
+This project builds the core booking flow — browse showings, hold seats, pay to confirm — with two guarantees that hold even under heavy concurrent load:
 
-We care less about polish and more about correctness under realistic conditions. In particular, we look for:
+- **No seat is ever double-sold**, even when many customers race for the same last seats.
+- **No customer can hold more than 7 tickets for a single showing**, even across multiple simultaneous requests.
 
-- Correct handling of state transitions and failure cases
-- Clear and reliable enforcement of business rules
-- Thoughtful tradeoffs and explicit assumptions
-- End-to-end product behavior that works in real user flows
-- Ability to explain implementation decisions clearly
+## What's implemented
 
-A working UI alone is not sufficient if core invariants can be violated through implementation details or edge cases.
+- **Showings & seat maps.** Browse scheduled showings, see a live seat map per showing (available / held by someone else / held by you / paid).
+- **Holds.** Selecting seats creates a temporary hold with a 5-minute expiry. Unpaid holds automatically become available again once they expire — no cron job, expiry is checked lazily wherever it matters (reading the seat map, attempting to pay, creating a new hold).
+- **Pay.** Confirms a hold into a paid ticket. Payment itself is mocked (no real payment provider) — "pay" is a state transition from `active` → `paid`, guarded so you can't pay someone else's hold, pay twice, or pay a hold that already expired.
+- **Per-customer cap.** At most 7 live (held or paid) tickets per customer per showing, enforced at the database transaction level, not just checked in application code.
+- **Concurrency safety.** Verified with an integration test suite that fires real concurrent requests at Postgres (not mocked) and asserts the invariants hold.
+- **Mock auth (pre-existing scaffold).** Email-only login — not real authentication, just enough to have a "current user" for the rest of the app to build on.
 
-You do not need production-scale infrastructure or pixel-perfect UI. We value correctness, clarity, and ownership over completeness.
+Not implemented: a box-office/operator view (out of scope for this pass — the customer flow was the priority).
 
-## A note on AI usage:
+## How the concurrency guarantees work
 
-You're encouraged to use AI tools throughout the assessment. We judge AI-generated code by the same standard as code you wrote yourself, so own everything that ships. Your full prompt history is captured by the remote environment automatically — you don't need to do anything to record it.
+The interesting engineering problem here isn't the CRUD — it's making the two invariants above hold when dozens of requests hit the same seat or the same customer's cap at the same instant.
 
-**Use only the AI tooling pre-installed in this remote environment.** Claude Code and Codex are already installed and ready to use — invoke those. Using any external AI application (e.g. ChatGPT, Claude.ai, Cursor, Copilot, or any tool outside this environment) is considered cheating and is grounds for disqualification, because it bypasses the prompt-history capture we rely on to evaluate your work. If you want AI help, ask the pre-installed Claude Code and Codex.
+**No-double-sell — enforced by the database, not application logic.**
+`holds` has a partial unique index:
 
-What matters most is that you understand and can clearly explain what you built: including the business logic, state transitions, tradeoffs, and implementation decisions behind your solution. We care far more about ownership and reasoning than whether code was AI-assisted.
+```sql
+CREATE UNIQUE INDEX "holds_live_seat_unique"
+  ON "holds" ("showing_id", "seat_id")
+  WHERE status IN ('active', 'paid');
+```
 
-## Background
+Only one *live* hold (active or paid) can ever exist for a given seat on a given showing. Two transactions racing to insert a hold for the same seat can't both commit — Postgres rejects the second with a `23505` unique-violation error, which the app catches and turns into a clean `409 seat_taken` response. This is stronger than an app-level "check if taken, then insert" — that pattern is inherently racy without a DB constraint backing it, because both requests can pass the check before either commits.
 
-We run a cinema that sells roughly 10,000 tickets a month. For major releases, seats can sell out within minutes. Right now, we lose money to scalpers buying up large blocks of seats.
+**7-ticket cap — enforced with a per-customer advisory lock.**
+The cap requires counting a customer's existing holds and rejecting if adding more would exceed 7 — but count-then-insert is racy on its own for the same reason as above. Each hold-creation transaction takes `pg_advisory_xact_lock(showingId, userId)` before counting, which serializes only *that customer's* concurrent requests for *that showing*. Two different customers, or the same customer on a different showing, never contend on this lock, so it doesn't bottleneck the showing as a whole even during a sellout — only a customer racing against themselves gets serialized.
 
-We’d like you to design and build a ticketing system that handles this reliably.
-
-## What it should do
-
-- A customer can browse showings, hold seats for a screening, and pay to confirm the hold.
-- Holds are temporary — if the customer doesn't pay in time, the seats go back into the pool.
-- To prevent scalpers, a single customer can buy at most 7 tickets for any one showing — enforce this limit.
-- Even if many customers race for the last seats, no seat is ever double-sold.
-
-This is a full-stack assessment. We expect a thin but real UI — at minimum the screens a customer needs to see showings, pick seats, hold them, and pay. The box-office operator view is a bonus, not a requirement. We also care about practical engineering judgment: endpoint boundaries, error semantics, UI states, and interaction flows should feel thoughtful and realistic.
-
-## What's yours to decide
-
-- API shape: endpoints, request/response format, error model.
-- Schema: how films, showings, seats, holds, payments, and customers relate.
-- Hold semantics: how long a hold lives, how it's released, how renewal/cancellation works.
-- How concurrency is enforced (the no-double-sell guarantee is on you).
-- Payment is mocked — there is no real payment provider. Decide what "pay" means at the API boundary.
-- The UI: which screens, what state they hold, how they react to seats being taken mid-flow.
-
-For anything not specified above, decide freely and write down what you chose in the Trade-offs section.
-
-## What we've given you in the starter repo
-
-The plumbing is done so you can spend the 50 minutes on the actual ticketing problem. What's in place:
-
-- **Auth flow (mock).** Email-only login: POST `/api/auth/login` with an email creates the user if it's new and sets an HttpOnly session cookie backed by Redis (7-day sliding expiry). `/api/auth/me`, `/api/auth/logout`, and a Hono middleware that hangs the current user on `c.var.user`. The `/login` and `/` pages are wired up — logged-out visits redirect to `/login`. **Not real auth; don't try to harden it.** It exists so the rest of the app can assume a current user.
-- **`users` table.** `id`, `email` (unique), `name`, `created_at`.
-- **`films` table.** `id`, `title`. The full domain schema is yours to design.
-- **Seed data.** `pnpm db:seed` inserts two users (`alice@example.com`, `bob@example.com`) and five films so the login + list pages have something to show out of the box.
-- **Frontend shell.** Feature-Sliced Design layout (`entities/`, `features/`, `widgets/`, `shared/`, `routes/`), Tailwind + shadcn/ui preconfigured, app shell with user/email + sign-out, films list on `/`.
-- **Hono API + Drizzle (`postgres-js`).** `/api/health` is live and verifies both Postgres and Redis. An example Vitest test that hits `/api/health` passes out of the box.
-
-What's **not** here (your job): showings, seat maps, holds, payments, the per-showing purchase cap, concurrency under contention.
-
-## Remote environment
-
-You're working inside a pre-provisioned remote environment. Already installed and running:
-
-- **Node.js 22** + **pnpm**
-- **Postgres 17** on `localhost:5432`
-- **Redis 6** on `localhost:6379`
-- This repo, with a working Hono + Vite setup, Drizzle config, mock auth + a tiny `users`/`films` schema, and one passing example test in `tests/`. A `/api/health` endpoint is live. Everything beyond auth + a film title list is yours to design.
+Both mechanisms are covered by integration tests (`src/entities/hold/server/concurrency.test.ts`) that fire real concurrent requests (via `Promise.allSettled`) at the live database and assert exactly one winner / exactly the cap survives.
 
 ## Stack
 
 - TypeScript
-- React (SPA via Vite)
-- TanStack Router (file-based) + TanStack Query
-- Hono (API server, runs on its own port)
-- DrizzleORM with the **`postgres-js`** driver
-- Postgres 17 and Redis 6
-- Tailwind CSS + shadcn/ui (preconfigured; install components as needed)
+- React (SPA via Vite) + TanStack Router + TanStack Query
+- Hono (API server)
+- Drizzle ORM (`postgres-js` driver)
+- Postgres 17, Redis 6
+- Tailwind CSS + shadcn/ui
 - Vitest
 
 ## Run it
 
 ```bash
 pnpm install
-pnpm db:migrate        # applies the shipped users/films migration
-pnpm db:seed           # inserts the two test users + five films
+pnpm db:migrate
+pnpm db:seed        # two test users + five films + a seeded room/showings
 pnpm dev
 ```
 
-When you extend the schema in `src/db/schema.ts`, run `pnpm db:generate` to produce a new migration, then `pnpm db:migrate` to apply it.
-
-You can sign in as `alice@example.com` or `bob@example.com` — or any other email; new emails auto-create a user.
-
 `pnpm dev` starts two processes:
 
-- **web** — Vite dev server on `http://localhost:5173` (SPA + HMR, proxies `/api/*` to the API)
+- **web** — Vite dev server on `http://localhost:5173` (proxies `/api/*` to the API)
 - **api** — Hono on `http://localhost:3001` (the only thing that talks to Postgres/Redis)
 
-Defaults: `DATABASE_URL=postgres://postgres@localhost:5432/pensive`, `REDIS_URL=redis://localhost:6379`. Override via `.env.local` (see `.env.example`).
+Sign in with `alice@example.com` or `bob@example.com` (or any email — new ones auto-create a user).
 
-Verify the app is running:
-
-```bash
-curl http://localhost:5173/api/health   # via Vite proxy
-curl http://localhost:3001/api/health   # directly against Hono (use this for concurrency tests)
-```
-
-Both should return `{"ok":true,"db":true,"redis":true}` once migrations have run.
+Defaults: `DATABASE_URL=postgres://postgres@localhost:5432/pensive`, `REDIS_URL=redis://localhost:6379`. Override via `.env.local`.
 
 ## Test it
 
@@ -118,22 +72,17 @@ Both should return `{"ok":true,"db":true,"redis":true}` once migrations have run
 pnpm test
 ```
 
-## Time and submission
+Includes integration tests that exercise the no-double-sell and per-customer-cap guarantees under real concurrent load against Postgres.
 
-You have **50 minutes** from when you start. When you're done (or when time is up), go to the top toolbar and click the **Submit** button in the menu. That bundles your code, this README, and your prompt history.
+## Design notes & trade-offs
 
-## How to preview your application
+- **A paid hold doubles as the ticket.** No separate `tickets` table — `holds.status = 'paid'` plus `paidAt` is the ticket record. Simpler schema; a system that needed refunds, transfers, or check-in would likely split these once tickets need their own lifecycle.
+- **Hold expiry is lazy, not cron-driven.** Liveness is computed from `expiresAt` at read time and opportunistically swept to `expired` within the same transaction wherever a hold is touched (seat map read, pay attempt, new hold creation). Simpler than a background job, and it can't race with a real payment since `payHolds` re-checks `expiresAt` itself before confirming.
+- **5-minute hold TTL** — a reasonable window to enter payment details; not derived from any specific requirement.
+- **Seats are shared across showings in the same room**, not duplicated per showing. A showing's seat map is a join of `seats` (scoped by room) against live holds for that specific `showingId`.
+- **Frontend polls the seat map every 4 seconds** rather than pushing updates over websockets/SSE, to keep other customers' seat selections visible without extra infrastructure. Good enough at this scale; push-based updates would be the next step if that polling interval ever felt stale under real load.
+- **No idempotency keys on payment.** Since payment is mocked and there's no real provider to reconcile against, the pay endpoint just relies on the hold's own state machine (`active` → `paid`, rejecting repeats) rather than a separate idempotency layer.
 
-Click the play button in the top toolbar. This will preview your application in a new tab.
+## Built with AI assistance
 
-## Trade-offs you made
-
-- **No-double-sell via a partial unique index, not app-level locking.** `holds_live_seat_unique` is a Postgres unique index on `(showing_id, seat_id) WHERE status IN ('active','paid')`. Even racing transactions from different app instances can't both commit a live hold for the same seat — the loser gets a `23505` unique violation, which the repo layer catches and turns into `409 seat_taken`. This is stronger than an app-level check-then-insert, which is inherently racy without it.
-- **7-ticket cap via `pg_advisory_xact_lock(showingId, userId)`.** The cap requires a count-then-insert, which is racy on its own (two concurrent requests can both pass the count check before either commits). The advisory lock serializes only *this customer's* concurrent requests for *this showing* — different customers, or the same customer on a different showing, never contend on it, so it doesn't bottleneck the whole showing under a sellout.
-- **A paid hold doubles as the ticket.** No separate `tickets` table — `holds.status = 'paid'` plus `paidAt` is the ticket record. Simpler schema for the scope of this assessment; a real system would likely split them once tickets need their own lifecycle (refunds, transfers, check-in).
-- **Hold expiry is lazy, not cron-driven.** A hold's liveness is computed from `expiresAt` at read time (seat map, pay, create-hold's pre-check) and opportunistically swept to `expired` in the same transaction. No background job needed, and it can't race with a real payment because `payHolds` re-checks `expiresAt` itself before confirming.
-- **5-minute hold TTL**, chosen arbitrarily as a reasonable window to enter payment details; not specified by the brief.
-- **"Pay" is a no-op state transition.** Per the brief, payment is mocked — `POST /api/holds/pay` just flips owned, active, unexpired holds to `paid`. No idempotency key/webhook handling since there's no real payment provider to be idempotent against.
-- **Seats are shared across showings in the same room**, not per-showing rows. A showing's seat map is derived by joining `seats` (scoped by `room`) against live `holds` for that `showingId`. Keeps seeding simple; the seat identity itself never changes between showings.
-- **No box-office/operator view.** Called out in the brief as a bonus, not a requirement — skipped to keep the full customer flow (browse → hold → pay) solid within the time box.
-- **Frontend polls the seat map every 4s** rather than using websockets/SSE, to keep other customers' holds visible without added infra. Good enough at this scale; would reach for push-based updates before load makes 4s stale.
+This project was built with Claude Code as a pair-programming tool — used for implementation, running concurrency tests against a live Postgres instance to verify the invariants above, and catching a real bug in the process (an error-unwrapping mismatch that would have surfaced as an unhandled 500 instead of a clean `409` under genuine database contention, found by writing and running the integration tests rather than by inspection).
