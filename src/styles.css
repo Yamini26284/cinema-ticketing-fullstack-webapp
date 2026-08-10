@@ -1,0 +1,374 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+:root {
+  --radius: 0.625rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: var(--primary-500);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Primary teal scale */
+  --primary-50: #f2f9f9;
+  --primary-100: #d9ecec;
+  --primary-200: #bfdfdf;
+  --primary-300: #8cc6c6;
+  --primary-400: #59acac;
+  --primary-500: #008080;
+  --primary-600: #007676;
+  --primary-700: #006666;
+  --primary-800: #005757;
+  --primary-900: #004646;
+  --primary-950: #003a3a;
+
+  /* Brand palette */
+  --complementary: #0386ff;
+  --success: #23a660;
+  --error: #e23e3e;
+  --warning: #ffcc00;
+  --dark-warning: #e68851;
+}
+
+@theme inline {
+  --font-sans: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-primary-50: var(--primary-50);
+  --color-primary-100: var(--primary-100);
+  --color-primary-200: var(--primary-200);
+  --color-primary-300: var(--primary-300);
+  --color-primary-400: var(--primary-400);
+  --color-primary-500: var(--primary-500);
+  --color-primary-600: var(--primary-600);
+  --color-primary-700: var(--primary-700);
+  --color-primary-800: var(--primary-800);
+  --color-primary-900: var(--primary-900);
+  --color-primary-950: var(--primary-950);
+
+  --color-success: var(--success);
+  --color-error: var(--error);
+  --color-warning: var(--warning);
+  --color-complementary: var(--complementary);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+  }
+}
+
+/* ============================================
+   Text Styles — synced from Figma
+   ============================================ */
+
+/* Heading — Geist SemiBold, line-height = font-size */
+
+@utility text-heading-72 {
+  font-family: var(--font-sans);
+  font-size: 4.5rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.06em;
+}
+
+@utility text-heading-64 {
+  font-family: var(--font-sans);
+  font-size: 4rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.06em;
+}
+
+@utility text-heading-56 {
+  font-family: var(--font-sans);
+  font-size: 3.5rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.06em;
+}
+
+@utility text-heading-48 {
+  font-family: var(--font-sans);
+  font-size: 3rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.06em;
+}
+
+@utility text-heading-40 {
+  font-family: var(--font-sans);
+  font-size: 2.5rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.06em;
+}
+
+@utility text-heading-32 {
+  font-family: var(--font-sans);
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+@utility text-heading-24 {
+  font-family: var(--font-sans);
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+@utility text-heading-20 {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+@utility text-heading-16 {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+@utility text-heading-14 {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* Button — Geist Medium */
+
+@utility text-button-lg {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+}
+
+@utility text-button-default {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 500;
+}
+
+@utility text-button-sm {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 500;
+}
+
+/* Label — Geist Regular */
+
+@utility text-label-20 {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  line-height: 2rem;
+  font-weight: 400;
+}
+
+@utility text-label-18 {
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+@utility text-label-16 {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+@utility text-label-14 {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+@utility text-label-14-mono {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+@utility text-label-13 {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1rem;
+  font-weight: 400;
+}
+
+@utility text-label-13-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1rem;
+  font-weight: 400;
+}
+
+@utility text-label-12 {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 400;
+}
+
+@utility text-label-12-mono {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  font-weight: 400;
+}
+
+/* Copy — Geist Regular */
+
+@utility text-copy-24 {
+  font-family: var(--font-sans);
+  font-size: 1.5rem;
+  line-height: 2.25rem;
+  font-weight: 400;
+}
+
+@utility text-copy-20 {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  line-height: 2.25rem;
+  font-weight: 400;
+}
+
+@utility text-copy-18 {
+  font-family: var(--font-sans);
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  font-weight: 400;
+}
+
+@utility text-copy-16 {
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 400;
+}
+
+@utility text-copy-14 {
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 400;
+}
+
+@utility text-copy-13 {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 400;
+}
+
+@utility text-copy-13-mono {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  font-weight: 400;
+}
+
+/* Shadows */
+
+@utility card-shadow {
+  box-shadow:
+    4px 4px 13px 0px #00000005,
+    18px 16px 24px 0px #00000005,
+    40px 37px 32px 0px #00000003;
+}
+
+@utility dropdown-shadow {
+  box-shadow:
+    2px 7px 16px 0px #0000001a,
+    9px 28px 29px 0px #00000017,
+    20px 63px 40px 0px #0000000d,
+    35px 113px 47px 0px #00000003,
+    55px 176px 52px 0px #00000000,
+    -4px -4px 24.8px 0px #00000012;
+}
