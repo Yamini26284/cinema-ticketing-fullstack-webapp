@@ -128,4 +128,12 @@ Click the play button in the top toolbar. This will preview your application in 
 
 ## Trade-offs you made
 
-Write down any trade-offs you made here.
+- **No-double-sell via a partial unique index, not app-level locking.** `holds_live_seat_unique` is a Postgres unique index on `(showing_id, seat_id) WHERE status IN ('active','paid')`. Even racing transactions from different app instances can't both commit a live hold for the same seat — the loser gets a `23505` unique violation, which the repo layer catches and turns into `409 seat_taken`. This is stronger than an app-level check-then-insert, which is inherently racy without it.
+- **7-ticket cap via `pg_advisory_xact_lock(showingId, userId)`.** The cap requires a count-then-insert, which is racy on its own (two concurrent requests can both pass the count check before either commits). The advisory lock serializes only *this customer's* concurrent requests for *this showing* — different customers, or the same customer on a different showing, never contend on it, so it doesn't bottleneck the whole showing under a sellout.
+- **A paid hold doubles as the ticket.** No separate `tickets` table — `holds.status = 'paid'` plus `paidAt` is the ticket record. Simpler schema for the scope of this assessment; a real system would likely split them once tickets need their own lifecycle (refunds, transfers, check-in).
+- **Hold expiry is lazy, not cron-driven.** A hold's liveness is computed from `expiresAt` at read time (seat map, pay, create-hold's pre-check) and opportunistically swept to `expired` in the same transaction. No background job needed, and it can't race with a real payment because `payHolds` re-checks `expiresAt` itself before confirming.
+- **5-minute hold TTL**, chosen arbitrarily as a reasonable window to enter payment details; not specified by the brief.
+- **"Pay" is a no-op state transition.** Per the brief, payment is mocked — `POST /api/holds/pay` just flips owned, active, unexpired holds to `paid`. No idempotency key/webhook handling since there's no real payment provider to be idempotent against.
+- **Seats are shared across showings in the same room**, not per-showing rows. A showing's seat map is derived by joining `seats` (scoped by `room`) against live `holds` for that `showingId`. Keeps seeding simple; the seat identity itself never changes between showings.
+- **No box-office/operator view.** Called out in the brief as a bonus, not a requirement — skipped to keep the full customer flow (browse → hold → pay) solid within the time box.
+- **Frontend polls the seat map every 4s** rather than using websockets/SSE, to keep other customers' holds visible without added infra. Good enough at this scale; would reach for push-based updates before load makes 4s stale.

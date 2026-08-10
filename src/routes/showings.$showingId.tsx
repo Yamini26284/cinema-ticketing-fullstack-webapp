@@ -1,9 +1,9 @@
 import { createFileRoute, redirect } from '@tanstack/react-router'
 
 import { SESSION_QUERY_KEY, fetchMe } from '#/features/auth/api/auth'
-import { ShowingsList } from '#/features/showings-list/ui/showings-list'
+import { SeatMap } from '#/features/seat-map/ui/seat-map'
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute('/showings/$showingId')({
   beforeLoad: async ({ context }) => {
     const user = await context.queryClient.ensureQueryData({
       queryKey: SESSION_QUERY_KEY,
@@ -11,16 +11,17 @@ export const Route = createFileRoute('/')({
     })
     if (!user) throw redirect({ to: '/login' })
   },
-  component: HomePage,
+  component: ShowingPage,
 })
 
-function HomePage() {
+function ShowingPage() {
+  const { showingId } = Route.useParams()
   return (
     <div className="flex flex-col gap-6">
       <header>
-        <h1 className="text-heading-32 text-foreground">Now showing</h1>
+        <h1 className="text-heading-32 text-foreground">Select your seats</h1>
       </header>
-      <ShowingsList />
+      <SeatMap showingId={Number(showingId)} />
     </div>
   )
 }
